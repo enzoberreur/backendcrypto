@@ -206,7 +206,7 @@ def plot_chart_analysis(df):
             date = chart_df.iloc[candle_idx].name
             fig.add_trace(go.Scatter(x=[date], y=[price], mode='markers', marker=dict(color='#BA68C8', size=8, symbol='circle-open'), showlegend=False))
     fig.update_layout(
-        title="Chart chartiste (200 dernières bougies)",
+        title="Analyse chartiste (200 dernières bougies)",
         height=500,
         template="plotly_dark",
         margin=dict(t=40, b=20)
