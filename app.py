@@ -157,8 +157,8 @@ def find_trend_lines(df, min_points=3, max_lines=3, price_tolerance=0.005):
         return filtered_lines[:max_lines]
     return (filter_similar_lines(support_lines), filter_similar_lines(resistance_lines))
 
-def plot_chart_analysis(df):
-    chart_df = df.copy().iloc[-200:]
+def plot_chart_analysis(df, n_bars=200):
+    chart_df = df.copy().iloc[-n_bars:]
     support_lvls, resistance_lvls = find_support_resistance(chart_df, window=5, threshold=0.02)
     trend_supports, trend_resistances = find_trend_lines(chart_df, min_points=3, max_lines=3)
     fig = go.Figure()
@@ -407,21 +407,59 @@ st.title("Crypto Trading Backtester")
 
 # Barre latérale pour les paramètres
 with st.sidebar:
-    st.header("Configuration")
-    
-    # Sélection de la paire
+    st.header("Configuration générale")
     symbol = st.selectbox(
         "Paire de trading",
         ["ETHUSDT", "BTCUSDT", "BNBUSDT", "DOGEUSDT", "SOLUSDT"]
     )
-    
-    # Sélection du timeframe
     timeframe = st.selectbox(
         "Intervalle",
         ["1h", "4h", "1d"]
     )
-    
-    # Sélection de la stratégie
+    date_range = st.date_input(
+        "Période de test",
+        value=(datetime.now() - timedelta(days=365), datetime.now()),
+        max_value=datetime.now()
+    )
+    n_bars_chart = st.number_input(
+        "Bougies affichées sur l'analyse chartiste",
+        min_value=50, max_value=1000, value=200, step=10,
+        help="Nombre de bougies affichées sur le graphique chartiste en haut de page."
+    )
+    st.divider()
+    st.header("Backtesting & capital")
+    initial_capital = st.number_input("Capital initial (USDT)", 100, 1000000, 10000)
+    position_size = st.slider("Taille de position (%)", 1, 100, 10) / 100
+    st.subheader("Frais et Slippage")
+    col1, col2 = st.columns(2)
+    with col1:
+        maker_fee = st.slider(
+            "Frais maker (%)",
+            min_value=0.0,
+            max_value=0.5,
+            value=0.1,
+            step=0.01,
+            help="Frais pour les ordres limit (ajout de liquidité)"
+        ) / 100
+        taker_fee = st.slider(
+            "Frais taker (%)",
+            min_value=0.0,
+            max_value=0.5,
+            value=0.1,
+            step=0.01,
+            help="Frais pour les ordres market (prélèvement de liquidité)"
+        ) / 100
+    with col2:
+        slippage = st.slider(
+            "Slippage estimé (%)",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.1,
+            step=0.05,
+            help="Différence entre prix attendu et prix d'exécution."
+        ) / 100
+    st.divider()
+    st.header("Stratégie & paramètres")
     strategy_type = st.selectbox(
         "Stratégie",
         [
@@ -693,75 +731,13 @@ with st.sidebar:
                 # Réinitialiser les paramètres pour la stratégie actuelle
                 st.session_state.strategy_params[strategy_type] = {}
                 st.rerun()
-    
-    # Paramètres de backtesting
-    st.header("Paramètres de Backtesting")
-    initial_capital = st.number_input("Capital initial (USDT)", 100, 1000000, 10000)
-    position_size = st.slider("Taille de position (%)", 1, 100, 10) / 100
-    
-    # Paramètres de frais et slippage
-    st.subheader("Frais et Slippage")
-    fees_help = """
-    **Comprendre les frais et le slippage :**
-    - **Frais maker** : Appliqués lors de l'ajout de liquidité (ordres limites)
-    - **Frais taker** : Appliqués lors du retrait de liquidité (ordres market)
-    - **Slippage** : Différence entre prix attendu et prix d'exécution
-    """
-    st.info(fees_help)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("##### Frais de trading")
-        maker_fee = st.slider(
-            "Frais maker (%)",
-            min_value=0.0,
-            max_value=0.5,
-            value=0.1,
-            step=0.01,
-            help="Les frais maker sont généralement plus bas car vous ajoutez de la liquidité au marché"
-        ) / 100
-        
-        taker_fee = st.slider(
-            "Frais taker (%)",
-            min_value=0.0,
-            max_value=0.5,
-            value=0.1,
-            step=0.01,
-            help="Les frais taker sont généralement plus élevés car vous prenez de la liquidité du marché"
-        ) / 100
-        
-    with col2:
-        st.markdown("##### Slippage")
-        slippage = st.slider(
-            "Slippage estimé (%)",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.1,
-            step=0.05,
-            help="Le slippage représente la différence entre le prix attendu et le prix d'exécution réel. Il augmente avec la volatilité et la taille des ordres."
-        ) / 100
-        
-        st.markdown("""
-        <small>
-        💡 Plus le marché est volatil ou moins il y a de liquidité, plus le slippage sera important.
-        </small>
-        """, unsafe_allow_html=True)
-    
-    # Période de test
-    st.header("Période de Test")
-    date_range = st.date_input(
-        "Période",
-        value=(datetime.now() - timedelta(days=365), datetime.now()),
-        max_value=datetime.now()
-    )
 
 # Charger les données
 data = load_historical_data(symbol, timeframe)
 
 if data is not None:
     # Afficher le chart chartiste tout en haut
-    st.plotly_chart(plot_chart_analysis(data), use_container_width=True)
+    st.plotly_chart(plot_chart_analysis(data, n_bars=n_bars_chart), use_container_width=True)
     # Filtrer les données selon la période sélectionnée
     start_date = pd.Timestamp(date_range[0])
     end_date = pd.Timestamp(date_range[1])
